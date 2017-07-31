@@ -59,6 +59,9 @@ def depth2xyzuv(depth, u=None, v=None):
     u,v = mgrid[10:120,50:80]
     xyz,uv = depth2xyzuv(freenect.sync_get_depth()[v,u], u, v)
   """
+  
+  [w, l] = np.shape(depth)
+  
   if u is None or v is None:
     u,v = np.mgrid[:480,:640]
   
@@ -68,20 +71,22 @@ def depth2xyzuv(depth, u=None, v=None):
   # Project the duv matrix into xyz using xyz_matrix()
   X,Y,Z,W = np.dot(xyz_matrix(),C)
   X,Y,Z = X/W, Y/W, Z/W
-  X = np.reshape(X,[480,640,1])
-  Y = np.reshape(Y,[480,640,1])
-  Z = np.reshape(Z,[480,640,1])
+  X = np.reshape(X,[w,l,1])
+  Y = np.reshape(Y,[w,l,1])
+  Z = np.reshape(Z,[w,l,1])
+  
+  #xyz = np.zeros((480,640,3))
   xyz = np.concatenate((X,Y,Z), axis=2)
 #  xyz = xyz[Z<0,:]
 
   # Project the duv matrix into U,V rgb coordinates using rgb_matrix() and xyz_matrix()
-  U,V,_,W = np.dot(np.dot(uv_matrix(), xyz_matrix()),C)
-  U,V = U/W, V/W
-  uv = np.vstack((U,V)).transpose
+  #U,V,_,W = np.dot(np.dot(uv_matrix(), xyz_matrix()),C)
+  #U,V = U/W, V/W
+  #uv = np.vstack((U,V)).transpose
 #  uv = uv[Z<0,:]       
 
   # Return both the XYZ coordinates and the UV coordinates
-  return xyz, uv
+  return xyz#, uv
 
 
 

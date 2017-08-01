@@ -59,6 +59,9 @@ def main():
   lower_blue = np.array([105,125,20])
   upper_blue = np.array([135,255,255])
   
+  xcal = 14
+  ycal = -9
+  
   if plot_traj:
     plt.ion()
     fig = plt.figure()
@@ -79,11 +82,12 @@ def main():
       (depth,_), (bgr,_) = get_depth(), get_video()
       
       # Simple Downsample
-      if 0:#plot_figures:
+      if plot_figures:
         # Build a two panel color image
         d3 = np.dstack((depth,depth,depth)).astype(np.uint8)
         da = np.hstack((d3,bgr))
-        cv2.imshow('both',np.array(da[::2,::2,::-1]))
+        da[:,320+xcal:320+xcal+4,0:3] = 0
+        #cv2.imshow('both',np.array(da[::2,::2,::-1]))
 
       # convert inmage to HSV space for color filtering
       hsv = cv2.cvtColor(bgr, cv2.COLOR_RGB2HSV)
@@ -135,7 +139,7 @@ def main():
                 circles = temp
               else:
                 circles = np.concatenate((circles, temp), axis=1)
-      if plot_figures:  
+      if plot_figures:
         circles_im =  cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         
       if circles is not None:
@@ -167,20 +171,42 @@ def main():
           #  pos = np.median(xyz[circles[0,biggest_circle,1]-l:circles[0,biggest_circle,1]+l, circles[0,biggest_circle,0]-l:circles[0,biggest_circle,0]+l,2])
           #else:
           
-          # get position of identified ball
-          # get depth in meters
-          y, x = circles[0,biggest_circle,1], circles[0,biggest_circle,0]
-          #xyz = depth2xyzuv(np.array([[depth[y,x]]]), np.array([[circles[0,biggest_circle,1]]]), np.array([[circles[0,biggest_circle,0]]]))
-          if x > 2 and x < 640-2 and y > 2 and y < 480:
-            u,v = np.mgrid[y-2:y+2,x-2:x+2]
-            xyz = depth2xyzuv(depth[y-2:y+2,x-2:x+2], u, v)
+          print circles[0,biggest_circle,0], circles[0,biggest_circle,1] 
+          x, y = circles[0,biggest_circle,0] + xcal, circles[0,biggest_circle,1] + ycal
           
-            pos = np.array([np.median(xyz[:,:,0]), np.median(xyz[:,:,1]),np.median(xyz[:,:,2])])
-
-            if pos[2] < 0:
-              pos[0] = run_filter(prev_pos[0], pos[0], dt)
-              pos[1] = run_filter(prev_pos[1], pos[1], dt)
-              pos[2] = run_filter(prev_pos[2], pos[2], dt)
+          x = np.uint16(np.around(x + (x - 640/2 - 1) * 0.09))
+          y = np.uint16(np.around(y + (y - 480/2 - 1) * 0.07))
+          
+          # average distance over area of half the radius of the ball
+          w = 5
+          if w >= circles[0,biggest_circle,2] / 4:
+            w = circles[0,biggest_circle,2] / 4 + 1
+          
+          # get position of identified ball in meters
+          if x >= w and x < 640-w and y >= w and y < 480-w:
+            u,v = np.mgrid[y-w:y+w+1,x-w:x+w+1]
+            xyz = depth2xyzuv(depth[y-w:y+w+1,x-w:x+w+1], u, v)
+            
+            if plot_figures:
+              cv2.circle(da,(x+xcal,y+ycal),2,(0,0,255),3)
+          
+            # get average values of x,y,z
+            sum0 = 0
+            sum1 = 0
+            sum2 = 0
+            num = 0
+            for i in np.arange(0,w+1):
+              for j in np.arange(0,w+1):
+                if xyz[i,j,2] < 0:
+                  print xyz[i,j,:]
+                  sum0 = sum0 + xyz[i,j,0]
+                  sum1 = sum1 + xyz[i,j,1]
+                  sum2 = sum2 + xyz[i,j,2]
+                  num = num + 1
+            
+            # we need at least one good value to estimate the position
+            if num > 0:
+              pos = np.array([sum0/num, sum1/num,sum2/num])
               
               speed = (pos - prev_pos) / dt
               speed[0] = run_filter(prev_speed[0], speed[0], dt)
@@ -198,7 +224,9 @@ def main():
                 print "X pred: ", X_pred, speed, dt
       
       if plot_figures:
+        circles_im[:,320,0:2] = 0
         cv2.imshow('blob',circles_im)
+        cv2.imshow('both',np.array(da[::2,::2,::-1]))
 
       if plot_traj:
         pred_hist.append(X_pred)

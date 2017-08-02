@@ -59,7 +59,8 @@ def main():
   lower_blue = np.array([105,125,20])
   upper_blue = np.array([135,255,255])
   
-  xcal = 14
+  xcal = 12
+  xcalz = 10
   ycal = -9
   
   if plot_traj:
@@ -68,13 +69,6 @@ def main():
   
   while True:
       ball_found = 0
-      
-      # bookkeeping for time
-      frame_time = time.time()
-      dt = frame_time - prev_frame_time
-      #print dt
-      
-      prev_frame_time = frame_time
       
       #print "dt: ", dt
 #    try:
@@ -86,7 +80,7 @@ def main():
         # Build a two panel color image
         d3 = np.dstack((depth,depth,depth)).astype(np.uint8)
         da = np.hstack((d3,bgr))
-        da[:,320+xcal:320+xcal+4,0:3] = 0
+        d3[:,320+xcal:320+xcal+2,0:3] = 0
         #cv2.imshow('both',np.array(da[::2,::2,::-1]))
 
       # convert inmage to HSV space for color filtering
@@ -171,16 +165,16 @@ def main():
           #  pos = np.median(xyz[circles[0,biggest_circle,1]-l:circles[0,biggest_circle,1]+l, circles[0,biggest_circle,0]-l:circles[0,biggest_circle,0]+l,2])
           #else:
           
-          print circles[0,biggest_circle,0], circles[0,biggest_circle,1] 
+          #print circles[0,biggest_circle,0], circles[0,biggest_circle,1]
           x, y = circles[0,biggest_circle,0] + xcal, circles[0,biggest_circle,1] + ycal
           
-          x = np.uint16(np.around(x + (x - 640/2 - 1) * 0.09))
+          x = np.uint16(np.around(x + (x - 640/2 - 1) * 0.09) + (1 + prev_pos[2]) * xcalz)
           y = np.uint16(np.around(y + (y - 480/2 - 1) * 0.07))
           
           # average distance over area of half the radius of the ball
           w = 5
-          if w >= circles[0,biggest_circle,2] / 4:
-            w = circles[0,biggest_circle,2] / 4 + 1
+          if w >= circles[0,biggest_circle,2] / 5:
+            w = circles[0,biggest_circle,2] / 5 + 1
           
           # get position of identified ball in meters
           if x >= w and x < 640-w and y >= w and y < 480-w:
@@ -188,7 +182,7 @@ def main():
             xyz = depth2xyzuv(depth[y-w:y+w+1,x-w:x+w+1], u, v)
             
             if plot_figures:
-              cv2.circle(da,(x+xcal,y+ycal),2,(0,0,255),3)
+              cv2.circle(d3,(x+xcal,y+ycal),2,(0,0,255),3)
           
             # get average values of x,y,z
             sum0 = 0
@@ -198,7 +192,7 @@ def main():
             for i in np.arange(0,w+1):
               for j in np.arange(0,w+1):
                 if xyz[i,j,2] < 0:
-                  print xyz[i,j,:]
+                  #print xyz[i,j,:]
                   sum0 = sum0 + xyz[i,j,0]
                   sum1 = sum1 + xyz[i,j,1]
                   sum2 = sum2 + xyz[i,j,2]
@@ -206,27 +200,34 @@ def main():
             
             # we need at least one good value to estimate the position
             if num > 0:
+              # bookkeeping for time
+              frame_time = time.time()
+              dt = frame_time - prev_frame_time
+      
               pos = np.array([sum0/num, sum1/num,sum2/num])
+              
+              pos[0] = run_filter(prev_pos[0], pos[0], dt)
+              pos[1] = run_filter(prev_pos[1], pos[1], dt)
+              pos[2] = run_filter(prev_pos[2], pos[2], dt)
               
               speed = (pos - prev_pos) / dt
               speed[0] = run_filter(prev_speed[0], speed[0], dt)
               speed[1] = run_filter(prev_speed[1], speed[1], dt)
               speed[2] = run_filter(prev_speed[2], speed[2], dt)
               
+              # if ball is going towards the camera
+              if speed[2] >= 0.05:
+                X_pred = pos[1] - pos[2] * speed[1]/speed[2]
+                print "X pred: ", X_pred, speed, dt, pos - prev_pos, (1 + prev_pos[2]) * xcalz
+                
               prev_pos = np.array(pos)
               prev_speed = np.array(speed)
-            
-              #print "pos, speed: ", pos, speed
-              
-              # if ball is going towards the camera
-              if speed[2] >= 0.01:
-                X_pred = pos[1] - pos[2] * speed[1]/speed[2]
-                print "X pred: ", X_pred, speed, dt
+              prev_frame_time = frame_time
       
       if plot_figures:
         circles_im[:,320,0:2] = 0
         cv2.imshow('blob',circles_im)
-        cv2.imshow('both',np.array(da[::2,::2,::-1]))
+        cv2.imshow('both',np.array(d3[:,:,::-1]))
 
       if plot_traj:
         pred_hist.append(X_pred)

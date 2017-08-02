@@ -104,8 +104,8 @@ def uv_matrix():
                    [0.002814, -0.999831, 0.018190],
                    [-0.005151, -0.018175, -0.999822]])
   #trans = np.array([[1.9985e-02, -7.44237e-04,-1.0916736e-02]])
-  trans = np.array([[ -0.026428, 0.010690, -0.021136 ]])
-#  trans = np.array([[ 0.2, 0, 0 ]])
+  #trans = np.array([[ -0.026428, 0.010690, -0.021136 ]])
+  trans = np.array([[ 0.2, 0, 0 ]])
   m = np.hstack((rot, -trans.transpose()))
   m = np.vstack((m, np.array([[0,0,0,1]])))
 #  KK = np.array([[529.2, 0, 329, 0],
